@@ -4,6 +4,7 @@ import type { DatasetDoc, MapDoc } from '../lib/mapDoc';
 import { deleteDataset, getDatasets, getMap, patchMap, saveDataset } from '../lib/workspaceApi';
 import { MapView, type Viewport } from '../map/MapView';
 import { renderContext } from '../pages/ViewerPage';
+import { LayersPanel } from './LayersPanel';
 import { SourcesPanel } from './SourcesPanel';
 import { builderReducer, initState, type BuilderState } from './state';
 import { useAutosave, type SaveApi, type SaveStatus } from './useAutosave';
@@ -76,7 +77,18 @@ function Builder({ initial, api, fetcher, autosaveDelayMs }: { initial: BuilderS
           ))}
         </nav>
         {tab === 'sources' && <SourcesPanel datasets={state.datasets} errors={state.errors} layerCount={c.visState.layers.length} dispatch={dispatch} fetcher={fetcher} />}
-        {tab === 'layers' && <p className="panel">Layers (Task 13)</p>}
+        {tab === 'layers' && (
+          <LayersPanel
+            layers={c.visState.layers}
+            datasets={state.datasets}
+            loaded={rendered.prepared?.datasets ?? []}
+            popupSettings={c.popupSettings}
+            dispatch={dispatch}
+            viewport={viewport}
+            ctx={ctx}
+            fetcher={fetcher}
+          />
+        )}
         {tab === 'widgets' && <p className="panel">Widgets (Task 14)</p>}
         {tab === 'parameters' && <p className="panel">Parameters (Task 15)</p>}
       </aside>
