@@ -47,9 +47,10 @@ func TestServerWiring(t *testing.T) {
 		"/api/workspace/maps":                 `"data":[]`,
 		"/v3/maps/osm/table?name=demo_points": `"tilejson"`,
 		"/api/workspace/connections":          `"osm"`,
-		"/assets/app.js":                      "console.log(1)",
-		"/maps":                               "<html>app</html>", // SPA fallback
-		"/viewer/123":                         "<html>app</html>",
+		"/v3/sql/osm/model/formula?type=table&source=demo_points&params=%7B%22column%22%3A%22%2A%22%7D": `"value":400`,
+		"/assets/app.js": "console.log(1)",
+		"/maps":          "<html>app</html>", // SPA fallback
+		"/viewer/123":    "<html>app</html>",
 	} {
 		res, err := http.Get(srv.URL + path)
 		if err != nil {
