@@ -14,3 +14,6 @@ button { cursor: pointer; padding: 6px 14px; border-radius: 4px; border: 1px sol
 .viewer header { padding: 8px 16px; background: #102a43; color: #fff; }
 .viewer header h1 { font-size: 16px; margin: 0; }
 .viewer-map { flex: 1; }
+.map-view { position: relative; flex: 1; min-height: 0; }
+.map-canvas { position: absolute; inset: 0; }
+.loading { padding: 24px; }

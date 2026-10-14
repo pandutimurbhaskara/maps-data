@@ -1,60 +1,60 @@
-import { MapboxOverlay } from '@deck.gl/mapbox';
-import { Map as MapLibreMap } from 'maplibre-gl';
-import { useEffect, useRef, useState } from 'react';
+import type { Layer } from '@deck.gl/core';
+import { useEffect, useState } from 'react';
 import { useParams } from 'react-router';
-import { layersFromDoc } from '../lib/layersFromDoc';
+import { normalizeConfig } from '../lib/defaults';
 import type { DatasetDoc, MapDoc } from '../lib/mapDoc';
 import { getDatasets, getMap, getPublicMap } from '../lib/workspaceApi';
-import { basemapStyle, OSM_ATTRIBUTION } from '../map/basemaps';
-import { toDeckLayer } from '../map/deckLayers';
+import { MapView } from '../map/MapView';
+import { prepareMap } from '../map/prepareMap';
+import { toDeckLayers } from '../map/toDeckLayers';
 
 type Loaded = { doc: MapDoc; datasets: DatasetDoc[] };
 
 export async function loadPrivate(id: string): Promise<Loaded> {
   const [doc, datasets] = await Promise.all([getMap(id), getDatasets(id)]);
-  return { doc, datasets };
+  return { doc: { ...doc, keplerMapConfig: normalizeConfig(doc.keplerMapConfig) }, datasets };
 }
 
 export async function loadPublic(id: string): Promise<Loaded> {
   const { datasets, ...doc } = await getPublicMap(id);
-  return { doc, datasets };
+  return { doc: { ...doc, keplerMapConfig: normalizeConfig(doc.keplerMapConfig) }, datasets };
 }
+
+// M1 dev auth ignores the token; M3 switches to authMode: 'session'.
+export const renderContext = () => ({ apiBaseUrl: window.location.origin, accessToken: 'dev' });
 
 export function ViewerPage({ load }: { load: (id: string) => Promise<Loaded> }) {
   const { id = '' } = useParams();
-  const container = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<Loaded | null>(null);
+  const [layers, setLayers] = useState<Layer[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    load(id).then(setState, (e: Error) => setError(e.message));
+    let cancelled = false;
+    setError(null);
+    load(id).then(
+      async (loaded) => {
+        const { parsed } = await prepareMap(loaded.doc, loaded.datasets, renderContext());
+        if (cancelled) return;
+        setState(loaded);
+        setLayers(toDeckLayers(parsed.layers));
+      },
+      (e: Error) => !cancelled && setError(e.message),
+    );
+    return () => {
+      cancelled = true;
+    };
   }, [id, load]);
 
-  useEffect(() => {
-    if (!state || !container.current) return;
-    const { mapState, basemapConfig } = state.doc.keplerMapConfig.config;
-    const map = new MapLibreMap({
-      container: container.current,
-      style: basemapStyle(basemapConfig?.styleId),
-      center: [mapState.longitude, mapState.latitude],
-      zoom: mapState.zoom,
-      pitch: mapState.pitch ?? 0,
-      bearing: mapState.bearing ?? 0,
-      attributionControl: { compact: false, customAttribution: OSM_ATTRIBUTION },
-    });
-    const { layers, warnings } = layersFromDoc(state.doc.keplerMapConfig, state.datasets);
-    warnings.forEach((w) => console.warn('[viewer]', w));
-    map.addControl(new MapboxOverlay({ layers: layers.map(toDeckLayer) }));
-    return () => map.remove();
-  }, [state]);
-
   if (error) return <p role="alert">{error}</p>;
+  if (!state) return <p className="loading">Loading…</p>;
+  const { config } = state.doc.keplerMapConfig;
   return (
     <div className="viewer">
       <header>
-        <h1>{state?.doc.title ?? 'Loading…'}</h1>
+        <h1>{state.doc.title}</h1>
       </header>
-      <div ref={container} className="viewer-map" />
+      <MapView styleId={config.basemapConfig.styleId} initialViewState={config.mapState} layers={layers} />
     </div>
   );
 }
