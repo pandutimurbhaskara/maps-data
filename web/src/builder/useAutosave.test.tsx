@@ -74,4 +74,27 @@ describe('useAutosave', () => {
     await act(async () => vi.advanceTimersByTimeAsync(800));
     expect(result.current.status).toBe('saved');
   });
+
+  it('flushes a pending edit when the builder unmounts (e.g. Preview) instead of dropping it', async () => {
+    const api = { patchMap: vi.fn(async () => ({})), saveDataset: vi.fn(async () => ({})), deleteDataset: vi.fn(async () => {}) };
+    const { result, unmount } = setup(api);
+    act(() => result.current.dispatch({ type: 'renameMap', title: 'renamed' }));
+    unmount();
+    expect(api.patchMap).toHaveBeenCalledWith('m', expect.objectContaining({ title: 'renamed' }));
+  });
+
+  it('asks before leaving the page while changes are unsaved', async () => {
+    const api = { patchMap: vi.fn(async () => ({})), saveDataset: vi.fn(async () => ({})), deleteDataset: vi.fn(async () => {}) };
+    const { result } = setup(api);
+    const leave = () => {
+      const e = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(e);
+      return e.defaultPrevented;
+    };
+    expect(leave()).toBe(false);
+    act(() => result.current.dispatch({ type: 'renameMap', title: 'unsaved' }));
+    expect(leave()).toBe(true);
+    await act(async () => vi.advanceTimersByTimeAsync(800));
+    expect(leave()).toBe(false);
+  });
 });

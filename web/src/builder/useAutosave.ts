@@ -57,7 +57,28 @@ export function useAutosave(state: BuilderState, dispatch: Dispatch<Action>, api
     if (hasChanges(state)) schedule.current();
   }, [state]);
 
-  useEffect(() => () => clearTimeout(timer.current), []);
+  useEffect(() => {
+    // Leaving the page with unsaved edits: ask first (the browser shows its own prompt) and start the save.
+    const onLeave = (e: BeforeUnloadEvent) => {
+      if (!hasChanges(latest.current)) return;
+      e.preventDefault();
+      void run();
+    };
+    window.addEventListener('beforeunload', onLeave);
+    return () => {
+      window.removeEventListener('beforeunload', onLeave);
+      // Unmounting (Preview, Maps) must not drop the last edit: save now rather than after the debounce.
+      // run() issues its first request synchronously, before the next page loads the map; while a save is
+      // in flight, the pending timer is kept so the remainder is saved after it.
+      if (!hasChanges(latest.current)) clearTimeout(timer.current);
+      else if (!inFlight.current) {
+        clearTimeout(timer.current);
+        void run();
+      }
+    };
+    // run and latest are refs/closures over refs; registering once is intended
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return status;
 }
