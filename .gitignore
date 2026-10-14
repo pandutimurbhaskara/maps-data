@@ -1,0 +1,6 @@
+*.duckdb
+*.duckdb.wal
+*.osm.pbf
+node_modules/
+web/dist/
+.superpowers/
