@@ -20,7 +20,8 @@ SELECT kind::VARCHAR AS kind, id, tags, refs, lat, lon FROM ST_ReadOSM(` + quote
 
 func quoteLiteral(s string) string { return "'" + strings.ReplaceAll(s, "'", "''") + "'" }
 
-// Multipolygon relations are not assembled (spec §4.5); closed ways only.
+// Multipolygon relations are not assembled (spec §4.5); closed ways only. ST_IsClosed guards ways whose end
+// node lies outside the extract: their line is open even though refs[1] = refs[-1].
 var derivedSQL = []string{
 	`CREATE OR REPLACE TEMP MACRO osm_is_area(t) AS
 	   (map_contains(t, 'building') OR map_contains(t, 'landuse') OR map_contains(t, 'leisure')
@@ -47,13 +48,13 @@ var derivedSQL = []string{
 	        w.tags['landuse'] AS landuse, w.tags['leisure'] AS leisure, w.tags,
 	        ST_MakePolygon(l.line) AS geom
 	 FROM osm_raw w JOIN osm_way_lines l ON l.way_id = w.id
-	 WHERE w.kind = 'way' AND l.n >= 4 AND w.refs[1] = w.refs[-1] AND osm_is_area(w.tags)`,
+	 WHERE w.kind = 'way' AND l.n >= 4 AND w.refs[1] = w.refs[-1] AND ST_IsClosed(l.line) AND osm_is_area(w.tags)`,
 
 	`CREATE OR REPLACE TABLE osm_lines AS
 	 SELECT w.id AS osm_id, w.tags['name'] AS name, w.tags['highway'] AS highway,
 	        w.tags['railway'] AS railway, w.tags['waterway'] AS waterway, w.tags, l.line AS geom
 	 FROM osm_raw w JOIN osm_way_lines l ON l.way_id = w.id
-	 WHERE w.kind = 'way' AND NOT (l.n >= 4 AND w.refs[1] = w.refs[-1] AND osm_is_area(w.tags))`,
+	 WHERE w.kind = 'way' AND NOT (l.n >= 4 AND w.refs[1] = w.refs[-1] AND ST_IsClosed(l.line) AND osm_is_area(w.tags))`,
 
 	`CREATE INDEX IF NOT EXISTS osm_points_geom ON osm_points USING RTREE (geom)`,
 	`CREATE INDEX IF NOT EXISTS osm_lines_geom ON osm_lines USING RTREE (geom)`,

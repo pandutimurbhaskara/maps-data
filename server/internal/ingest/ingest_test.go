@@ -25,7 +25,10 @@ func TestBuildDerived(t *testing.T) {
 		  ('node', 4, MAP {'amenity': 'cafe', 'name': 'Kissa'}, NULL, 35.0005, 139.0005),
 		  ('way', 10, MAP {'building': 'yes', 'name': 'Hall'}, [1, 2, 3, 1], NULL, NULL),
 		  ('way', 11, MAP {'highway': 'residential'}, [1, 2], NULL, NULL),
-		  ('way', 12, MAP {'highway': 'service', 'building': 'roof', 'area': 'no'}, [1, 2, 3, 1], NULL, NULL)`,
+		  ('way', 12, MAP {'highway': 'service', 'building': 'roof', 'area': 'no'}, [1, 2, 3, 1], NULL, NULL),
+		  ('node', 5, MAP {}, NULL, 35.001, 139.0),
+		  -- review fix: closed way whose end node (99) is outside the extract must not abort the ingest
+		  ('way', 13, MAP {'building': 'yes'}, [99, 1, 2, 3, 5, 99], NULL, NULL)`,
 	} {
 		if _, err := db.Exec(q); err != nil {
 			t.Fatal(err)
