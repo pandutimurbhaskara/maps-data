@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"math"
+	"strconv"
 	"strings"
 
 	"osm-maps/server/internal/describe"
@@ -59,9 +61,12 @@ type query struct {
 type modelFunc func(ctx context.Context, q query, p params) (any, error)
 
 var models = map[string]modelFunc{
-	"formula":  formula,
-	"range":    rangeModel,
-	"category": category,
+	"formula":    formula,
+	"range":      rangeModel,
+	"category":   category,
+	"histogram":  histogram,
+	"table":      table,
+	"timeseries": timeseries,
 }
 
 func bad(format string, a ...any) error {
@@ -164,4 +169,116 @@ func category(ctx context.Context, q query, p params) (any, error) {
 		meta["others"] = others
 	}
 	return map[string]any{"rows": rows, "metadata": meta}, nil
+}
+
+func histogram(ctx context.Context, q query, p params) (any, error) {
+	c, _, err := q.column(p.columnName())
+	if err != nil {
+		return nil, err
+	}
+	if len(p.Ticks) == 0 {
+		return nil, bad("histogram needs at least one tick")
+	}
+	cases := "CASE"
+	for i, t := range p.Ticks {
+		if math.IsNaN(t) || math.IsInf(t, 0) || (i > 0 && t <= p.Ticks[i-1]) {
+			return nil, bad("ticks must be finite and strictly increasing")
+		}
+		cases += " WHEN __x < " + strconv.FormatFloat(t, 'g', -1, 64) + " THEN " + strconv.Itoa(i)
+	}
+	cases += " ELSE " + strconv.Itoa(len(p.Ticks)) + " END"
+	agg, err := q.aggregate(ctx, p.Operation, p.columnName(), p.OperationExp)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := q.rows(ctx, fmt.Sprintf(
+		"SELECT %s AS tick, %s AS value FROM (SELECT *, CAST(%s AS DOUBLE) AS __x FROM %s AS _r) AS _h WHERE __x IS NOT NULL GROUP BY 1 ORDER BY 1",
+		cases, agg, c, q.rel))
+	return map[string]any{"rows": rows}, err
+}
+
+func table(ctx context.Context, q query, p params) (any, error) {
+	names := p.columnList()
+	if len(names) == 0 {
+		return nil, bad("table needs columns")
+	}
+	sel := make([]string, len(names))
+	for i, n := range names {
+		c, col, err := q.column(n)
+		if err != nil {
+			return nil, err
+		}
+		if col.Type == "geometry" {
+			sel[i] = "ST_AsText(" + c + ") AS " + c
+		} else {
+			sel[i] = c
+		}
+	}
+	order := ""
+	if p.SortBy != "" {
+		c, _, err := q.column(p.SortBy)
+		if err != nil {
+			return nil, err
+		}
+		dir := "ASC"
+		switch strings.ToLower(p.SortDirection) {
+		case "", "asc":
+		case "desc":
+			dir = "DESC"
+		default:
+			return nil, bad("sortDirection must be asc or desc")
+		}
+		order = " ORDER BY " + c + " " + dir + " NULLS LAST"
+	}
+	limit := p.Limit
+	if limit == 0 {
+		limit = 10
+	}
+	if limit < 1 || limit > 1000 || p.Offset < 0 {
+		return nil, bad("limit must be 1..1000 and offset >= 0")
+	}
+	rows, err := q.rows(ctx, fmt.Sprintf("SELECT %s FROM %s AS _r%s LIMIT %d OFFSET %d", strings.Join(sel, ", "), q.rel, order, limit, p.Offset))
+	if err != nil {
+		return nil, err
+	}
+	total, err := q.rows(ctx, "SELECT count(*) AS total FROM "+q.rel+" AS _r")
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"rows": rows, "metadata": map[string]any{"total": total[0]["total"]}}, nil
+}
+
+var stepUnits = map[string]bool{"year": true, "month": true, "week": true, "day": true, "hour": true, "minute": true, "second": true}
+
+func timeseries(ctx context.Context, q query, p params) (any, error) {
+	if p.SplitByCategory != "" {
+		return nil, bad("splitByCategory is not supported yet")
+	}
+	col := p.columnName()
+	c, _, err := q.column(col)
+	if err != nil {
+		return nil, err
+	}
+	if !stepUnits[p.StepSize] {
+		return nil, bad("unsupported stepSize %q", p.StepSize)
+	}
+	mult := p.StepMultiplier
+	if mult == 0 {
+		mult = 1
+	}
+	if mult < 1 || mult > 1000 {
+		return nil, bad("stepMultiplier must be 1..1000")
+	}
+	opCol := p.OperationColumn
+	if opCol == "" || p.Operation == "" || p.Operation == "count" {
+		opCol = "*"
+	}
+	agg, err := q.aggregate(ctx, p.Operation, opCol, p.OperationExp)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := q.rows(ctx, fmt.Sprintf(
+		"SELECT epoch_ms(time_bucket(INTERVAL '%d %s', CAST(%s AS TIMESTAMP))) AS name, %s AS value FROM %s AS _r WHERE %s IS NOT NULL GROUP BY 1 ORDER BY 1",
+		mult, p.StepSize, c, agg, q.rel, c))
+	return map[string]any{"rows": rows, "metadata": map[string]any{"categories": nil}}, err
 }

@@ -110,3 +110,62 @@ func TestCategory(t *testing.T) {
 		t.Fatalf("sum by category first = %+v", r.Rows[0])
 	}
 }
+
+func TestHistogram(t *testing.T) {
+	status, r := call(t, newServer(t), "histogram", `{"column":"value","operation":"count","ticks":[100,200,300]}`, nil)
+	if status != 200 || len(r.Rows) != 4 {
+		t.Fatalf("histogram: %d %+v", status, r)
+	}
+	for i, row := range r.Rows {
+		if row["tick"] != float64(i) || row["value"] != 100.0 {
+			t.Fatalf("bucket %d = %+v", i, row)
+		}
+	}
+	if status, _ := call(t, newServer(t), "histogram", `{"column":"value","ticks":[]}`, nil); status != 400 {
+		t.Fatalf("empty ticks: %d, want 400", status)
+	}
+}
+
+func TestTable(t *testing.T) {
+	srv := newServer(t)
+	status, r := call(t, srv, "table", `{"column":["id","name","geom"],"sortBy":"id","sortDirection":"desc","limit":3,"offset":1}`, nil)
+	if status != 200 || len(r.Rows) != 3 || r.Rows[0]["id"] != 398.0 || r.Metadata["total"] != 400.0 {
+		t.Fatalf("table: %d %+v", status, r)
+	}
+	if wkt, _ := r.Rows[0]["geom"].(string); len(wkt) < 5 || wkt[:5] != "POINT" {
+		t.Fatalf("geom = %v, want WKT", r.Rows[0]["geom"])
+	}
+	if status, _ := call(t, srv, "table", `{"column":["id"],"limit":5000}`, nil); status != 400 {
+		t.Fatalf("limit too large: %d, want 400", status)
+	}
+}
+
+func TestTimeSeries(t *testing.T) {
+	srv := newServer(t)
+	status, r := call(t, srv, "timeseries", `{"column":"ts","stepSize":"day","operation":"count"}`, nil)
+	if status != 200 || len(r.Rows) != 17 || r.Rows[0]["name"] != 1767225600000.0 || r.Rows[0]["value"] != 24.0 || r.Rows[16]["value"] != 16.0 {
+		t.Fatalf("timeseries: %d %+v", status, r)
+	}
+	if _, ok := r.Metadata["categories"]; !ok {
+		t.Fatal("metadata.categories missing")
+	}
+	// 100-hour buckets are anchored at DuckDB's time_bucket origin (2000-01-03), not at the data start,
+	// so assert on the total rather than on bucket boundaries.
+	_, r = call(t, srv, "timeseries", `{"column":"ts","stepSize":"hour","stepMultiplier":100,"operation":"sum","operationColumn":"value"}`, nil)
+	sum := 0.0
+	for _, row := range r.Rows {
+		sum += row["value"].(float64)
+	}
+	if len(r.Rows) < 4 || sum != 79800 {
+		t.Fatalf("100-hour buckets: %+v", r.Rows)
+	}
+	for name, params := range map[string]string{
+		"split":     `{"column":"ts","stepSize":"day","splitByCategory":"category"}`,
+		"bad step":  `{"column":"ts","stepSize":"fortnight"}`,
+		"bad multi": `{"column":"ts","stepSize":"day","stepMultiplier":-2}`,
+	} {
+		if status, _ := call(t, srv, "timeseries", params, nil); status != 400 {
+			t.Errorf("%s: %d, want 400", name, status)
+		}
+	}
+}
