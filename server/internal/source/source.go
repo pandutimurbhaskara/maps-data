@@ -56,6 +56,7 @@ type Source struct {
 	Columns             []string
 	Filters             Filters
 	FiltersOr           bool
+	SpatialFilter       json.RawMessage // GeoJSON geometry; rows must intersect it (spec M2 D4)
 	AggregationExp      string
 	AggregationResLevel int
 }
@@ -132,11 +133,46 @@ func (s Source) Relation() (string, []any, error) {
 		return "", nil, err
 	}
 	args = append(args, fargs...)
-	rel := "(SELECT * FROM " + from + " AS _src"
+	spatial, sargs, err := s.spatialClause()
+	if err != nil {
+		return "", nil, err
+	}
+	args = append(args, sargs...)
+	var conds []string
 	if where != "" {
-		rel += " WHERE " + where
+		conds = append(conds, "("+where+")")
+	}
+	if spatial != "" {
+		conds = append(conds, spatial)
+	}
+	rel := "(SELECT * FROM " + from + " AS _src"
+	if len(conds) > 0 {
+		rel += " WHERE " + strings.Join(conds, " AND ")
 	}
 	return rel + ")", args, nil
+}
+
+// spatialClause keeps rows whose geometry (geo) or cell centre (h3) intersects SpatialFilter.
+func (s Source) spatialClause() (string, []any, error) {
+	if len(s.SpatialFilter) == 0 || string(s.SpatialFilter) == "null" {
+		return "", nil, nil
+	}
+	var g struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(s.SpatialFilter, &g); err != nil || g.Type == "" {
+		return "", nil, fmt.Errorf("%w: spatial filter must be a GeoJSON geometry", ErrBadRequest)
+	}
+	col, err := Ident(s.SpatialColumnName())
+	if err != nil {
+		return "", nil, err
+	}
+	target := col
+	if s.SpatialDataType == H3 {
+		target = "ST_Point(h3_cell_to_lng(" + col + "), h3_cell_to_lat(" + col + "))"
+	}
+	arg := sql.Named(InternalParamPrefix+"sf", string(s.SpatialFilter))
+	return "ST_Intersects(" + target + ", ST_GeomFromGeoJSON($" + InternalParamPrefix + "sf))", []any{arg}, nil
 }
 
 // bindParams binds only the parameters the query references: DuckDB rejects unused named args.

@@ -114,3 +114,29 @@ func TestQuerySources(t *testing.T) {
 		})
 	}
 }
+
+const westHalf = `{"type":"Polygon","coordinates":[[[139.69,35.64],[139.7475,35.64],[139.7475,35.76],[139.69,35.76],[139.69,35.64]]]}`
+
+func TestSpatialFilter(t *testing.T) {
+	db := testdb.Data(t)
+	geo := table(nil)
+	geo.SpatialFilter = json.RawMessage(westHalf)
+	if got := count(t, db, geo); got != 200 {
+		t.Fatalf("geo spatial filter = %d, want 200", got)
+	}
+	h3 := source.Source{Type: source.TypeTable, Name: "demo_points", SpatialDataType: source.H3, SpatialFilter: json.RawMessage(westHalf)}
+	if got := count(t, db, h3); got != 200 {
+		t.Fatalf("h3 spatial filter = %d, want 200", got)
+	}
+	// the spatial clause is ANDed even when column filters are ORed
+	or := table(filters(t, `{"category":{"in":{"values":["cafe"]}},"id":{"in":{"values":[1]}}}`))
+	or.FiltersOr, or.SpatialFilter = true, json.RawMessage(westHalf)
+	if got := count(t, db, or); got != 61 { // 60 cafes in the west half (j = 0, 4, 8 on 20 rows) + id 1
+		t.Fatalf("or + spatial = %d, want 61", got)
+	}
+	bad := table(nil)
+	bad.SpatialFilter = json.RawMessage(`[1,2]`)
+	if _, _, err := bad.Relation(); !errors.Is(err, source.ErrBadRequest) {
+		t.Fatalf("bad geojson err = %v", err)
+	}
+}

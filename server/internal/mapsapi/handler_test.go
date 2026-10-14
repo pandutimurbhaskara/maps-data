@@ -216,3 +216,12 @@ func TestConcurrentTiles(t *testing.T) {
 		t.Error(e)
 	}
 }
+
+func TestSpatialFiltersParam(t *testing.T) {
+	srv, _ := newServer(t, 1000)
+	sf := `{"geom":{"type":"Polygon","coordinates":[[[139.69,35.64],[139.7475,35.64],[139.7475,35.76],[139.69,35.76],[139.69,35.64]]]}}`
+	tj := instantiate(t, srv, "table", url.Values{"name": {"demo_points"}, "spatialFilters": {sf}})
+	if tj.Tilestats.Layers[0].Count != 200 {
+		t.Fatalf("count = %d, want 200", tj.Tilestats.Layers[0].Count)
+	}
+}

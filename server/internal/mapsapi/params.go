@@ -81,5 +81,18 @@ func SourceFrom(typ string, v url.Values) (source.Source, error) {
 		}
 		s.AggregationResLevel = n
 	}
+	if sf := v.Get("spatialFilters"); sf != "" && sf != "null" {
+		var byCol map[string]json.RawMessage
+		if err := json.Unmarshal([]byte(sf), &byCol); err != nil {
+			return s, fmt.Errorf("%w: spatialFilters must be an object of GeoJSON geometries", source.ErrBadRequest)
+		}
+		if g, ok := byCol[s.SpatialColumnName()]; ok {
+			s.SpatialFilter = g
+		} else if len(byCol) == 1 {
+			for _, g := range byCol {
+				s.SpatialFilter = g
+			}
+		}
+	}
 	return s, s.Validate()
 }
