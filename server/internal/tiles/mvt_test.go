@@ -96,3 +96,25 @@ func TestMVTTooLarge(t *testing.T) {
 		t.Fatalf("err = %v, want ErrTooLarge", err)
 	}
 }
+
+// Review fix: column names come from user SQL and may contain quotes; they must not break (or inject into) the MVT query.
+func TestMVTQuotedColumnName(t *testing.T) {
+	db := testdb.Data(t)
+	rel, args, err := source.Source{Type: source.TypeQuery, Query: `SELECT name AS "it's ""q""", geom FROM demo_points`, SpatialDataType: source.Geo}.Relation()
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := tiles.MVT(context.Background(), db, tiles.MVTRequest{
+		Relation: rel, Args: args, GeomColumn: `"geom"`, Props: []describe.Column{{Name: `it's "q"`, Type: "string"}}, MaxFeatures: 1000,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	layers, err := mvt.Unmarshal(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := layers[0].Features[0].Properties[`it's "q"`]; got == nil {
+		t.Fatalf("property missing; props = %v", layers[0].Features[0].Properties)
+	}
+}

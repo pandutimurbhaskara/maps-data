@@ -43,7 +43,8 @@ func MVT(ctx context.Context, db *sql.DB, r MVTRequest) ([]byte, error) {
 
 	fields := []string{"'__geom': __g"}
 	for _, c := range r.Props {
-		fields = append(fields, fmt.Sprintf("'%s': %s", c.Name, mvtValue(`"`+c.Name+`"`, c.Type)))
+		// names come from the user's SQL schema: escape both the key literal and the identifier
+		fields = append(fields, sqlString(c.Name)+": "+mvtValue(quoteIdent(c.Name), c.Type))
 	}
 	if r.FeatureID {
 		// Stable per geometry and below 2^53, so JavaScript reads it exactly.
@@ -84,6 +85,9 @@ SELECT (SELECT count(*) FROM src), (SELECT count(*) FROM clipped WHERE __g IS NO
 	}
 	return tile, nil
 }
+
+func sqlString(s string) string  { return "'" + strings.ReplaceAll(s, "'", "''") + "'" }
+func quoteIdent(s string) string { return `"` + strings.ReplaceAll(s, `"`, `""`) + `"` }
 
 func mvtValue(col, kind string) string {
 	switch kind {
