@@ -183,21 +183,7 @@ func Stats(ctx context.Context, db *sql.DB, rel string, args []any, cols []Colum
 }
 
 func categories(ctx context.Context, db *sql.DB, rel, col string, args []any) ([]Category, error) {
-	q := quote(col)
-	rows, err := db.QueryContext(ctx, "SELECT CAST("+q+" AS VARCHAR) AS c, count(*) AS n FROM "+rel+" AS _r WHERE "+q+" IS NOT NULL GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 10", args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []Category
-	for rows.Next() {
-		var c Category
-		if err := rows.Scan(&c.Category, &c.Frequency); err != nil {
-			return nil, err
-		}
-		out = append(out, c)
-	}
-	return out, rows.Err()
+	return topCategories(ctx, db, rel, col, args, 10)
 }
 
 func statsType(kind string) string {

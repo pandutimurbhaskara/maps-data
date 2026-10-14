@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -17,7 +16,6 @@ import (
 	"osm-maps/server/internal/describe"
 	"osm-maps/server/internal/httpx"
 	"osm-maps/server/internal/source"
-	"osm-maps/server/internal/sqlguard"
 	"osm-maps/server/internal/tiles"
 )
 
@@ -33,6 +31,10 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /v3/maps/{conn}/{type}", s.handleSource)
 	mux.HandleFunc("GET /v3/maps/{conn}/{type}/{z}/{x}/{y}", s.handleMVT)
 	mux.HandleFunc("GET /v3/maps/{conn}/{type}/{cell}", s.handleH3)
+	mux.HandleFunc("GET /v3/stats/{conn}/{attr}", s.handleStats)
+	mux.HandleFunc("POST /v3/stats/{conn}/{attr}", s.handleStats)
+	mux.HandleFunc("GET /v3/stats/{conn}/{table}/{attr}", s.handleStats)
+	mux.HandleFunc("POST /v3/stats/{conn}/{table}/{attr}", s.handleStats)
 }
 
 var errQuery = errors.New("query failed")
@@ -74,23 +76,9 @@ func (s *Server) prepare(ctx context.Context, db *sql.DB, typ string, v url.Valu
 	if err != nil {
 		return prepared{}, err
 	}
-	if src.Type == source.TypeQuery {
-		if err := sqlguard.ValidateSelect(ctx, db, src.Query); err != nil {
-			return prepared{}, err
-		}
-	}
-	if src.AggregationExp != "" {
-		if err := sqlguard.ValidateSelect(ctx, db, "SELECT "+src.AggregationExp); err != nil {
-			return prepared{}, err
-		}
-	}
-	rel, args, err := src.Relation()
+	rel, args, schema, err := Resolve(ctx, db, src)
 	if err != nil {
 		return prepared{}, err
-	}
-	schema, err := describe.Schema(ctx, db, rel, args)
-	if err != nil {
-		return prepared{}, queryError(err)
 	}
 	byName := make(map[string]describe.Column, len(schema))
 	for _, c := range schema {
@@ -305,18 +293,7 @@ func queryErrorUnlessKnown(err error) error {
 	return queryError(err)
 }
 
-func (s *Server) fail(ctx context.Context, w http.ResponseWriter, err error) {
-	switch {
-	case ctx.Err() != nil:
-		httpx.WriteError(w, http.StatusRequestTimeout, "query timed out")
-	case errors.Is(err, source.ErrBadRequest), errors.Is(err, sqlguard.ErrNotSelect),
-		errors.Is(err, errQuery), errors.Is(err, tiles.ErrTooLarge):
-		httpx.WriteError(w, http.StatusBadRequest, err.Error())
-	default:
-		log.Printf("mapsapi: %v", err)
-		httpx.WriteError(w, http.StatusInternalServerError, "internal error")
-	}
-}
+func (s *Server) fail(ctx context.Context, w http.ResponseWriter, err error) { Fail(ctx, w, err) }
 
 func cloneValues(v url.Values) url.Values {
 	out := make(url.Values, len(v))
