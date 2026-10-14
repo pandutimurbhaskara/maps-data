@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -35,6 +36,9 @@ func (s *Server) Register(mux *http.ServeMux) {
 }
 
 var errQuery = errors.New("query failed")
+
+// pathRe matches absolute filesystem paths (two or more segments) inside DuckDB error messages.
+var pathRe = regexp.MustCompile(`(?:[A-Za-z]:)?[/\\](?:[^\s"'/\\]+[/\\])+[^\s"'/\\]*`)
 
 type prepared struct {
 	src       source.Source
@@ -287,6 +291,7 @@ func queryError(err error) error {
 	if i := strings.IndexByte(msg, '\n'); i >= 0 {
 		msg = msg[:i]
 	}
+	msg = pathRe.ReplaceAllString(msg, "<path>") // spec §4.2: never echo server file paths
 	if len(msg) > 300 {
 		msg = msg[:300]
 	}
