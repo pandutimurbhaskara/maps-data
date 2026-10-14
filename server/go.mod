@@ -6,6 +6,7 @@ require (
 	github.com/duckdb/duckdb-go/v2 v2.10506.0
 	github.com/paulmach/orb v0.13.0
 	golang.org/x/mod v0.42.0
+	google.golang.org/protobuf v1.36.12
 )
 
 require (
