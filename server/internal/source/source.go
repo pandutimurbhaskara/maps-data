@@ -22,6 +22,9 @@ var paramRe = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*$`)
 const InternalParamPrefix = "p__"
 
 // Ident validates a SQL identifier and returns it double-quoted.
+// QuoteIdent double-quotes any name, escaping embedded quotes; safe for arbitrary column names.
+func QuoteIdent(name string) string { return `"` + strings.ReplaceAll(name, `"`, `""`) + `"` }
+
 func Ident(name string) (string, error) {
 	if !identRe.MatchString(name) {
 		return "", fmt.Errorf("%w: invalid identifier %q", ErrBadRequest, name)

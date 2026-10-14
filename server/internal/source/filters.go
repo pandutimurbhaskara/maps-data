@@ -38,10 +38,9 @@ func (f Filters) SQL(or bool) (string, []any, error) {
 		return "$" + name
 	}
 	for _, col := range sortedKeys(f) {
-		qc, err := Ident(col)
-		if err != nil {
-			return "", nil, err
-		}
+		// Columns come from the source's own schema (custom SQL may alias "kind of place"), so quote rather than
+		// restrict to plain identifiers; an unknown column fails in DuckDB's binder and maps to a 400.
+		qc := QuoteIdent(col)
 		for _, typ := range sortedKeys(f[col]) {
 			c, err := filterClause(qc, typ, f[col][typ], next)
 			if err != nil {

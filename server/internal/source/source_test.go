@@ -72,7 +72,6 @@ func TestFilters(t *testing.T) {
 func TestBadRequests(t *testing.T) {
 	for name, s := range map[string]source.Source{
 		"unknown filter type": table(source.Filters{"value": {"nearly": {}}}),
-		"bad filter column":   table(source.Filters{"x; drop": {"in": {}}}),
 		"bad table name":      {Type: source.TypeTable, Name: "demo_points; drop", SpatialDataType: source.Geo},
 		"three-part name":     {Type: source.TypeTable, Name: "a.b.c", SpatialDataType: source.Geo},
 		"empty query":         {Type: source.TypeQuery, Query: " ; ", SpatialDataType: source.Geo},
@@ -106,6 +105,11 @@ func TestQuerySources(t *testing.T) {
 			s.Filters = filters(t, `{"category":{"in":{"values":["shop"]}}}`)
 			return s
 		}(), 100},
+		"filter on a column with spaces and quotes": {func() source.Source {
+			s := q(`SELECT category AS "kind of place", value AS "it's ""v""", * FROM demo_points`, nil)
+			s.Filters = filters(t, `{"kind of place":{"in":{"values":["shop"]}},"it's \"v\"":{"between":{"values":[[0,99]]}}}`)
+			return s
+		}(), 25},
 	} {
 		t.Run(name, func(t *testing.T) {
 			if got := count(t, db, tc.src); got != tc.want {
