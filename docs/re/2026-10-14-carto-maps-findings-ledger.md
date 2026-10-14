@@ -107,6 +107,9 @@ the trial account (SSO, governance, Data Observatory, Workflows) were not exerci
 | U4 | Whether the H3 tile URL template placeholder is `{i}` | Contract test (plan Task 11) |
 | U5 | `scheme` varint enum values in the spatial tile | Not needed: the client ignores the field |
 | U6 | Comment create body, per-map role model | Not needed for M1 |
+| U2 ✔ | resolved (M1) | H3TileLayer requests res-6 cell tiles at z12; the server returns cells at tileRes + aggregationResLevel, and they render correctly |
+| U3 ✔ | resolved (M2) | Model API request/response shapes read from @carto/api-client 0.5.34 `executeModel` / `WidgetRemoteSource`; contract-tested |
+| U4 ✔ | resolved (M1) | `{i}` placeholder confirmed in deck.gl `getURLFromTemplate`, which replaces every tile-index key |
 
 ## Side effect of the investigation
 

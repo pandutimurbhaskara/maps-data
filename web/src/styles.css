@@ -68,3 +68,7 @@ button { cursor: pointer; padding: 6px 14px; border-radius: 4px; border: 1px sol
 .popup dl div { display: flex; gap: 6px; }
 .popup dt { color: #627d98; }
 .popup dd { margin: 0; }
+.viewer-body { flex: 1; display: flex; min-height: 0; }
+.viewer-side { width: 300px; overflow-y: auto; background: #fff; border-left: 1px solid #e1e4e8; padding: 8px; }
+.param-controls fieldset { border: 1px solid #e1e4e8; border-radius: 4px; margin: 0 0 8px; font-size: 12px; }
+.param-controls label { display: block; font-size: 12px; }
