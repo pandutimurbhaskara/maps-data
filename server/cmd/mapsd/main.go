@@ -19,6 +19,7 @@ import (
 	"osm-maps/server/internal/auth"
 	"osm-maps/server/internal/catalog"
 	"osm-maps/server/internal/duck"
+	"osm-maps/server/internal/geocode"
 	"osm-maps/server/internal/mapsapi"
 	"osm-maps/server/internal/modelapi"
 	"osm-maps/server/internal/store"
@@ -97,6 +98,7 @@ func newHandler(ctx context.Context, c config) (http.Handler, func(), error) {
 		MaxFeatures:  200_000,
 	}).Register(mux)
 	(&modelapi.Server{Conns: map[string]*sql.DB{"osm": dataDB}, QueryTimeout: c.QueryTimeout}).Register(mux)
+	(&geocode.Handler{DB: dataDB}).Register(mux)
 	(&workspace.Handler{
 		Store:       st,
 		Connections: []workspace.Connection{{Name: "osm", Provider: "duckdb"}},
