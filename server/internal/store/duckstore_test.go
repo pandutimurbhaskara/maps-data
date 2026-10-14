@@ -144,3 +144,26 @@ func TestDatasets(t *testing.T) {
 		t.Fatalf("second delete: %v", err)
 	}
 }
+
+// Review fix: concurrent writes to one row must not fail with DuckDB transaction conflicts.
+func TestConcurrentWrites(t *testing.T) {
+	s := open(t)
+	ctx := context.Background()
+	m := create(t, s, "alice", "M", "")
+	errs := make(chan error, 32)
+	for i := 0; i < 16; i++ {
+		go func(i int) {
+			_, err := s.UpdateMap(ctx, m.ID, store.MapPatch{Title: ptr(fmt.Sprintf("t%d", i))})
+			errs <- err
+		}(i)
+		go func(i int) {
+			_, err := s.PutDataset(ctx, m.ID, json.RawMessage(fmt.Sprintf(`{"id":"same","n":%d}`, i)))
+			errs <- err
+		}(i)
+	}
+	for i := 0; i < 32; i++ {
+		if err := <-errs; err != nil {
+			t.Errorf("concurrent write: %v", err)
+		}
+	}
+}

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -42,6 +43,9 @@ const summaryCols = "id, owner_id, title, description, tags, privacy, collaborat
 type DuckStore struct {
 	db  *sql.DB
 	Now func() time.Time
+	// mu serializes writes: DuckDB's optimistic concurrency aborts concurrent updates of one row
+	// ("Conflict on update"), and this process is the only writer.
+	mu sync.Mutex
 }
 
 func OpenDuck(ctx context.Context, path string) (*DuckStore, error) {
@@ -141,6 +145,8 @@ func (s *DuckStore) ListMaps(ctx context.Context, q ListQuery) ([]Map, Page, err
 }
 
 func (s *DuckStore) CreateMap(ctx context.Context, m Map) (Map, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if len(m.KeplerMapConfig) == 0 {
 		return Map{}, fmt.Errorf("%w: keplerMapConfig is required", ErrInvalid)
 	}
@@ -167,6 +173,8 @@ func (s *DuckStore) GetMap(ctx context.Context, id string) (Map, error) {
 }
 
 func (s *DuckStore) UpdateMap(ctx context.Context, id string, p MapPatch) (Map, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	sets := []string{"updated_at = ?"}
 	args := []any{s.Now()}
 	add := func(col string, v any) { sets = append(sets, col+" = ?"); args = append(args, v) }
@@ -200,6 +208,8 @@ func (s *DuckStore) UpdateMap(ctx context.Context, id string, p MapPatch) (Map, 
 }
 
 func (s *DuckStore) DeleteMap(ctx context.Context, id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -236,6 +246,8 @@ func (s *DuckStore) ListDatasets(ctx context.Context, mapID string) ([]json.RawM
 }
 
 func (s *DuckStore) PutDataset(ctx context.Context, mapID string, doc json.RawMessage) (json.RawMessage, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	var head struct {
 		ID string `json:"id"`
 	}
@@ -260,6 +272,8 @@ ON CONFLICT (map_id, id) DO UPDATE SET doc = excluded.doc, updated_at = excluded
 }
 
 func (s *DuckStore) DeleteDataset(ctx context.Context, mapID, datasetID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	res, err := s.db.ExecContext(ctx, "DELETE FROM datasets WHERE map_id = ? AND id = ?", mapID, datasetID)
 	if err != nil {
 		return err
