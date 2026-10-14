@@ -40,4 +40,17 @@ describe('ViewerPage', () => {
       expect(last[1][0].queryParameters).toEqual({ kinds: ['cafe'] });
     });
   });
+
+  it('tells the viewer when a source failed to load', async () => {
+    vi.mocked(prepareMap).mockResolvedValue({ parsed: { layers: [] } as never, datasets: [], errors: { [ds.id]: 'Table osm_pionts does not exist' } });
+    const load = vi.fn(async () => ({ doc, datasets: [ds] }));
+    render(
+      <MemoryRouter initialEntries={['/viewer/m']}>
+        <Routes>
+          <Route path="/viewer/:id" element={<ViewerPage load={load} />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByRole('alert')).toHaveTextContent('Q: Table osm_pionts does not exist');
+  });
 });

@@ -57,10 +57,19 @@ function Viewer({ initial }: { initial: BuilderState }) {
   const spatialFilter = useViewportFilter(viewport);
   const c = state.map.keplerMapConfig.config;
   const showParams = c.mapSettings.sqlParameterControls && c.sqlParameters.length > 0;
+  const failed = state.datasets.flatMap((d) => {
+    const msg = state.errors[d.id] ?? rendered.prepared?.errors[d.id];
+    return msg ? [`${d.label}: ${msg}`] : [];
+  });
   return (
     <div className="viewer">
       <header>
         <h1>{state.map.title}</h1>
+        {failed.length > 0 && (
+          <p role="alert" className="error">
+            {failed.join(' · ')}
+          </p>
+        )}
       </header>
       <div className="viewer-body">
         {showParams && (

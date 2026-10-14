@@ -1,7 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
-import { newMapConfig } from '../lib/defaults';
+import { newDataset, newMapConfig } from '../lib/defaults';
+import { prepareMap } from '../map/prepareMap';
 import { BuilderPage } from './BuilderPage';
 
 vi.mock('../map/MapView', () => ({ MapView: () => <div data-testid="map" /> }));
@@ -47,5 +48,20 @@ describe('BuilderPage', () => {
       </MemoryRouter>,
     );
     expect(await screen.findByRole('alert')).toBeInTheDocument();
+  });
+
+  it('shows server-side source errors in the Sources panel', async () => {
+    const ds = newDataset({ type: 'query', source: 'SELECT * FROM osm_pionts', geoColumn: 'geom', label: 'Typo' });
+    vi.mocked(prepareMap).mockResolvedValue({ parsed: { layers: [] } as never, datasets: [], errors: { [ds.id]: 'Table osm_pionts does not exist' } });
+    const f = vi.fn(async (input: RequestInfo | URL) => new Response(String(input).endsWith('/datasets') ? JSON.stringify([ds]) : JSON.stringify(map)));
+    const api = { patchMap: vi.fn(), saveDataset: vi.fn(), deleteDataset: vi.fn() };
+    render(
+      <MemoryRouter initialEntries={['/builder/m1']}>
+        <Routes>
+          <Route path="/builder/:id" element={<BuilderPage api={api} fetcher={f} />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText(/osm_pionts does not exist/)).toBeInTheDocument();
   });
 });

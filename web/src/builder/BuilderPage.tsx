@@ -84,7 +84,7 @@ function Builder({ initial, api, fetcher, autosaveDelayMs }: { initial: BuilderS
             </button>
           ))}
         </nav>
-        {tab === 'sources' && <SourcesPanel datasets={state.datasets} errors={state.errors} layerCount={c.visState.layers.length} dispatch={dispatch} fetcher={fetcher} />}
+        {tab === 'sources' && <SourcesPanel datasets={state.datasets} errors={{ ...rendered.prepared?.errors, ...state.errors }} layerCount={c.visState.layers.length} dispatch={dispatch} fetcher={fetcher} />}
         {tab === 'layers' && (
           <LayersPanel
             layers={c.visState.layers}
