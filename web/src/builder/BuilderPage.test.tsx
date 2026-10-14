@@ -34,4 +34,18 @@ describe('BuilderPage', () => {
     expect(await screen.findByText('Saved')).toBeInTheDocument();
     for (const tab of ['Layers', 'Widgets', 'Parameters', 'Sources']) fireEvent.click(screen.getByRole('tab', { name: tab }));
   });
+
+  it('shows an error instead of hanging on Loading… when the document cannot be read', async () => {
+    const broken = { ...map, keplerMapConfig: { version: 'v1', config: { visState: { layers: [null] } } } };
+    const f = vi.fn(async (input: RequestInfo | URL) => new Response(String(input).endsWith('/datasets') ? '[]' : JSON.stringify(broken)));
+    const api = { patchMap: vi.fn(), saveDataset: vi.fn(), deleteDataset: vi.fn() };
+    render(
+      <MemoryRouter initialEntries={['/builder/m1']}>
+        <Routes>
+          <Route path="/builder/:id" element={<BuilderPage api={api} fetcher={f} />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+  });
 });

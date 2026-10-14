@@ -92,6 +92,25 @@ export function normalizeLayer(l: LayerDoc): LayerDoc {
   };
 }
 
+// normalizeDataset maps M1 datasets (optional geoColumn, `spatialIndex: 'h3'`) onto the CARTO form (spec M2 D2).
+export function normalizeDataset(d: DatasetDoc): DatasetDoc {
+  const { spatialIndex, ...rest } = d as DatasetDoc & { spatialIndex?: string };
+  let geoColumn = rest.geoColumn || (spatialIndex === 'h3' ? 'h3' : 'geom');
+  if (spatialIndex === 'h3' && !geoColumn.startsWith('h3:')) geoColumn = `h3:${geoColumn}`;
+  const h3 = geoColumn.startsWith('h3:');
+  return {
+    ...rest,
+    connectionName: rest.connectionName ?? 'osm',
+    columns: rest.columns ?? [],
+    queryTemplate: rest.queryTemplate ?? null,
+    queryParameters: rest.queryParameters ?? null,
+    aggregationExp: rest.aggregationExp ?? null,
+    format: 'tilejson',
+    geoColumn,
+    aggregationResLevel: rest.aggregationResLevel ?? (h3 ? 4 : null),
+  };
+}
+
 export function newDataset(init: Pick<DatasetDoc, 'type' | 'source' | 'geoColumn' | 'label'> & Partial<DatasetDoc>): DatasetDoc {
   return {
     id: newId(),

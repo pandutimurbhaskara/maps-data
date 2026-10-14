@@ -1,6 +1,6 @@
 import type { Filters } from '@carto/api-client';
 import { buildAggregationExp } from '../lib/aggregation';
-import { normalizeConfig } from '../lib/defaults';
+import { normalizeConfig, normalizeDataset } from '../lib/defaults';
 import type { DatasetDoc, LayerDoc, MapConfig, MapDoc, MapState, SqlParameter, WidgetDoc } from '../lib/mapDoc';
 import { compileQuery } from '../lib/sqlParams';
 
@@ -37,7 +37,7 @@ export type Action =
 export function initState(map: MapDoc, datasets: DatasetDoc[]): BuilderState {
   const s: BuilderState = {
     map: { ...map, keplerMapConfig: normalizeConfig(map.keplerMapConfig) },
-    datasets,
+    datasets: datasets.map(normalizeDataset),
     errors: {},
     rev: { map: 0, datasets: {} },
     saved: { map: 0, datasets: {} },

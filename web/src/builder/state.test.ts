@@ -80,3 +80,18 @@ describe('builderReducer', () => {
     expect(s.map.keplerMapConfig.config.filters[pts.id]).toEqual({});
   });
 });
+
+describe('initState with M1 datasets', () => {
+  const map = { id: 'm', title: 'm', keplerMapConfig: newMapConfig() } as unknown as MapDoc;
+  it('maps spatialIndex/missing geoColumn onto the CARTO geoColumn convention', () => {
+    const m1 = [
+      { id: 'ds-h3', type: 'table', label: 'H3', connectionName: 'osm', source: 'demo_points', spatialIndex: 'h3' },
+      { id: 'ds-h3b', type: 'table', label: 'H3b', connectionName: 'osm', source: 'demo_points', geoColumn: 'cell', spatialIndex: 'h3' },
+      { id: 'ds-geo', type: 'table', label: 'Geo', connectionName: 'osm', source: 'demo_points' },
+    ] as never;
+    const s = initState(map, m1);
+    expect(s.datasets.map((d) => d.geoColumn)).toEqual(['h3:h3', 'h3:cell', 'geom']);
+    expect(s.datasets[0]).not.toHaveProperty('spatialIndex');
+    expect(s.datasets[0].aggregationResLevel).toBe(4);
+  });
+});

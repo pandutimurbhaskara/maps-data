@@ -27,10 +27,12 @@ export function BuilderPage({ api = defaultApi, fetcher = fetch, autosaveDelayMs
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
-    Promise.all([getMap(id, fetcher), getDatasets(id, fetcher)]).then(
-      ([map, datasets]: [MapDoc, DatasetDoc[]]) => !cancelled && setInitial(initState(map, datasets)),
-      (e: Error) => !cancelled && setError(e.message),
-    );
+    Promise.all([getMap(id, fetcher), getDatasets(id, fetcher)])
+      .then(([map, datasets]: [MapDoc, DatasetDoc[]]) => initState(map, datasets)) // a malformed document lands in the error path
+      .then(
+        (s) => !cancelled && setInitial(s),
+        (e: Error) => !cancelled && setError(e.message),
+      );
     return () => {
       cancelled = true;
     };

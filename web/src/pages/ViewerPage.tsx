@@ -33,10 +33,12 @@ export function ViewerPage({ load }: { load: (id: string) => Promise<Loaded> }) 
   useEffect(() => {
     let cancelled = false;
     setError(null);
-    load(id).then(
-      (l) => !cancelled && setInitial(initState(l.doc, l.datasets)),
-      (e: Error) => !cancelled && setError(e.message),
-    );
+    load(id)
+      .then((l) => initState(l.doc, l.datasets)) // a malformed document lands in the error path
+      .then(
+        (s) => !cancelled && setInitial(s),
+        (e: Error) => !cancelled && setError(e.message),
+      );
     return () => {
       cancelled = true;
     };
