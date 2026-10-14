@@ -39,6 +39,11 @@ func TestValidateSelect(t *testing.T) {
 		"SET threads = 1",
 		"CREATE TABLE x AS SELECT 1",
 		"SELECT (",
+		// Review fix: catalog/introspection functions expose server paths and settings.
+		"SELECT * FROM duckdb_databases()",
+		"SELECT ST_Point(0, 0) AS geom, (SELECT string_agg(install_path, ',') FROM duckdb_extensions()) AS p",
+		"SELECT current_setting('home_directory')",
+		"SELECT * FROM pragma_database_list",
 	} {
 		if err := sqlguard.ValidateSelect(ctx, db, q); !errors.Is(err, sqlguard.ErrNotSelect) {
 			t.Errorf("ValidateSelect(%q) = %v, want ErrNotSelect", q, err)
