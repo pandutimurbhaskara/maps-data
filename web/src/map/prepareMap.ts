@@ -19,8 +19,8 @@ export interface PreparedMap {
 type FillContext = Parameters<typeof _fillInMapDatasets>[1];
 
 // prepareMap runs CARTO's own map pipeline (spec M2 D1): sources → tilestats → parseMap.
-// A dataset that fails to load (bad SQL, unknown column) is reported in `errors` and its layers are dropped,
-// instead of failing the whole map.
+// A dataset that fails to load (bad SQL, unknown column) is reported in `errors`; layers of any dataset that is
+// not loaded (failed here, or left out by the caller) are dropped instead of failing the whole map.
 export async function prepareMap(doc: MapDoc, datasets: DatasetDoc[], ctx: RenderContext): Promise<PreparedMap> {
   const keplerMapConfig = structuredClone(doc.keplerMapConfig);
   const copies = structuredClone(datasets) as LoadedDataset[];
@@ -36,6 +36,7 @@ export async function prepareMap(doc: MapDoc, datasets: DatasetDoc[], ctx: Rende
     }),
   );
   const loaded = copies.filter((d) => !errors[d.id]);
+  const loadedIds = new Set(loaded.map((d) => d.id));
   const json = {
     ...doc,
     keplerMapConfig: {
@@ -44,7 +45,7 @@ export async function prepareMap(doc: MapDoc, datasets: DatasetDoc[], ctx: Rende
         ...keplerMapConfig.config,
         visState: {
           ...keplerMapConfig.config.visState,
-          layers: keplerMapConfig.config.visState.layers.filter((l) => !errors[l.config.dataId]),
+          layers: keplerMapConfig.config.visState.layers.filter((l) => loadedIds.has(l.config.dataId)),
         },
       },
     },
