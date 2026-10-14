@@ -13,7 +13,7 @@ import (
 type Filters map[string]map[string]FilterSpec
 
 type FilterSpec struct {
-	Values []json.RawMessage    `json:"values"`
+	Values []json.RawMessage   `json:"values"`
 	Params *StringSearchParams `json:"params,omitempty"`
 	Owner  string              `json:"owner,omitempty"`
 }
