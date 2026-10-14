@@ -90,6 +90,10 @@ func TestMapsLifecycle(t *testing.T) {
 	if status, m = e.do(t, "alice", "PATCH", "/api/workspace/maps/"+id, map[string]any{"title": "Tokyo POIs"}); status != 200 || m["title"] != "Tokyo POIs" {
 		t.Fatalf("patch: %d %v", status, m)
 	}
+	// Review fix: a null keplerMapConfig means "unchanged", never "erase the document".
+	if status, m = e.do(t, "alice", "PATCH", "/api/workspace/maps/"+id, map[string]any{"keplerMapConfig": nil}); status != 200 || m["keplerMapConfig"] == nil {
+		t.Fatalf("patch null config: %d %v", status, m)
+	}
 	if status, _ = e.do(t, "alice", "PATCH", "/api/workspace/maps/"+id, map[string]any{"title": ""}); status != 400 {
 		t.Fatalf("empty title: %d", status)
 	}

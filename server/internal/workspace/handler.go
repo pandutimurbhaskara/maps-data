@@ -177,6 +177,9 @@ func (h *Handler) patchMap(w http.ResponseWriter, r *http.Request, user string) 
 	if !decode(w, r, &body) {
 		return
 	}
+	if string(body.KeplerMapConfig) == "null" { // null means "unchanged", never "erase the document"
+		body.KeplerMapConfig = nil
+	}
 	if body.Title != nil && (strings.TrimSpace(*body.Title) == "" || len(*body.Title) > 255) {
 		badRequest(w, "title must be 1..255 characters")
 		return
@@ -357,7 +360,7 @@ func decode(w http.ResponseWriter, r *http.Request, dst any) bool {
 
 func isObject(raw json.RawMessage) bool {
 	var v map[string]any
-	return json.Unmarshal(raw, &v) == nil
+	return json.Unmarshal(raw, &v) == nil && v != nil
 }
 
 func intParam(s string, def, min, max int) (int, error) {
