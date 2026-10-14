@@ -31,7 +31,7 @@ function renderPage(f: typeof fetch) {
     <MemoryRouter initialEntries={['/maps']}>
       <Routes>
         <Route path="/maps" element={<MapsPage fetcher={f} />} />
-        <Route path="/viewer/:id" element={<p>viewer page</p>} />
+        <Route path="/builder/:id" element={<p>builder page</p>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -65,7 +65,7 @@ describe('MapsPage', () => {
     const { f, calls } = fakeApi(0);
     renderPage(f);
     fireEvent.click(await screen.findByRole('button', { name: 'Create your first map' }));
-    expect(await screen.findByText('viewer page')).toBeInTheDocument();
+    expect(await screen.findByText('builder page')).toBeInTheDocument();
     expect(calls).toContain('POST /api/workspace/maps');
   });
 

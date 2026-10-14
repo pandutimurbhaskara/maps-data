@@ -54,7 +54,7 @@ export function MapsPage({ fetcher = fetch }: { fetcher?: typeof fetch }) {
   async function onCreate() {
     try {
       const m = await createMap({}, fetcher);
-      navigate(`/viewer/${m.id}`);
+      navigate(`/builder/${m.id}`);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -101,7 +101,7 @@ export function MapsPage({ fetcher = fetch }: { fetcher?: typeof fetch }) {
 
 function MapCard({ map }: { map: MapSummary }) {
   return (
-    <Link className="map-card" to={`/viewer/${map.id}`}>
+    <Link className="map-card" to={`/builder/${map.id}`}>
       <div className="thumb" style={map.thumbnailUrl ? { backgroundImage: `url(${map.thumbnailUrl})` } : undefined} />
       <div className="meta">
         <strong>{map.title}</strong>

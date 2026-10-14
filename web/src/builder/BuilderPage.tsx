@@ -1,0 +1,89 @@
+import { useEffect, useMemo, useReducer, useState } from 'react';
+import { Link, useParams } from 'react-router';
+import type { DatasetDoc, MapDoc } from '../lib/mapDoc';
+import { deleteDataset, getDatasets, getMap, patchMap, saveDataset } from '../lib/workspaceApi';
+import { MapView, type Viewport } from '../map/MapView';
+import { renderContext } from '../pages/ViewerPage';
+import { SourcesPanel } from './SourcesPanel';
+import { builderReducer, initState, type BuilderState } from './state';
+import { useAutosave, type SaveApi, type SaveStatus } from './useAutosave';
+import { useRenderedMap } from './useRenderedMap';
+
+export type BuilderTab = 'sources' | 'layers' | 'widgets' | 'parameters';
+
+const defaultApi: SaveApi = { patchMap, saveDataset, deleteDataset };
+
+const STATUS: Record<SaveStatus, string> = { idle: 'All changes saved', saving: 'Saving…', saved: 'Saved', error: 'Not saved — retrying on next change' };
+
+export function BuilderPage({ api = defaultApi, fetcher = fetch, autosaveDelayMs = 800 }: { api?: SaveApi; fetcher?: typeof fetch; autosaveDelayMs?: number }) {
+  const { id = '' } = useParams();
+  const [initial, setInitial] = useState<BuilderState | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([getMap(id, fetcher), getDatasets(id, fetcher)]).then(
+      ([map, datasets]: [MapDoc, DatasetDoc[]]) => !cancelled && setInitial(initState(map, datasets)),
+      (e: Error) => !cancelled && setError(e.message),
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [id, fetcher]);
+  if (error) return <p role="alert">{error}</p>;
+  if (!initial) return <p className="loading">Loading…</p>;
+  return <Builder key={id} initial={initial} api={api} fetcher={fetcher} autosaveDelayMs={autosaveDelayMs} />;
+}
+
+function Builder({ initial, api, fetcher, autosaveDelayMs }: { initial: BuilderState; api: SaveApi; fetcher: typeof fetch; autosaveDelayMs: number }) {
+  const [state, dispatch] = useReducer(builderReducer, initial);
+  const status = useAutosave(state, dispatch, api, autosaveDelayMs);
+  const ctx = useMemo(renderContext, []);
+  const rendered = useRenderedMap(state, ctx);
+  const [viewport, setViewport] = useState<Viewport | null>(null);
+  const [tab, setTab] = useState<BuilderTab>('sources');
+  const c = state.map.keplerMapConfig.config;
+
+  function onViewportChange(v: Viewport) {
+    setViewport(v);
+    dispatch({ type: 'setMapState', mapState: { latitude: v.latitude, longitude: v.longitude, zoom: v.zoom, pitch: v.pitch, bearing: v.bearing } });
+  }
+
+  const tabs: [BuilderTab, string][] = [
+    ['sources', 'Sources'],
+    ['layers', 'Layers'],
+    ['widgets', 'Widgets'],
+    ['parameters', 'Parameters'],
+  ];
+  return (
+    <div className="builder">
+      <header className="builder-header">
+        <Link to="/maps">Maps</Link>
+        <input aria-label="Map title" value={state.map.title} onChange={(e) => dispatch({ type: 'renameMap', title: e.target.value })} />
+        <span className="save-status">{STATUS[status]}</span>
+        {rendered.error && (
+          <span role="alert" className="error">
+            {rendered.error}
+          </span>
+        )}
+        <Link to={`/viewer/${state.map.id}`}>Preview</Link>
+      </header>
+      <aside className="builder-left">
+        <nav role="tablist" className="tabs">
+          {tabs.map(([key, label]) => (
+            <button key={key} role="tab" aria-selected={tab === key} onClick={() => setTab(key)}>
+              {label}
+            </button>
+          ))}
+        </nav>
+        {tab === 'sources' && <SourcesPanel datasets={state.datasets} errors={state.errors} layerCount={c.visState.layers.length} dispatch={dispatch} fetcher={fetcher} />}
+        {tab === 'layers' && <p className="panel">Layers (Task 13)</p>}
+        {tab === 'widgets' && <p className="panel">Widgets (Task 14)</p>}
+        {tab === 'parameters' && <p className="panel">Parameters (Task 15)</p>}
+      </aside>
+      <main className="builder-map">
+        <MapView styleId={c.basemapConfig.styleId} initialViewState={c.mapState} layers={rendered.layers} onViewportChange={onViewportChange} />
+      </main>
+      <aside className="builder-right" data-viewport={viewport ? 'ready' : 'pending'} />
+    </div>
+  );
+}
