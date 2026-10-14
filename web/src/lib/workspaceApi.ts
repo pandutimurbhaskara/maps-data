@@ -79,3 +79,32 @@ export async function getDatasets(id: string, f: Fetch = fetch): Promise<Dataset
 export async function getPublicMap(id: string, f: Fetch = fetch): Promise<MapDoc & { datasets: DatasetDoc[] }> {
   return json<MapDoc & { datasets: DatasetDoc[] }>(await f(`/v3/maps/public/${encodeURIComponent(id)}`));
 }
+
+export interface Resource {
+  name: string;
+  columns: { name: string; type: string }[];
+  geoColumn: string;
+  h3Column?: string;
+}
+
+export async function patchMap(id: string, body: Partial<Pick<MapDoc, 'title' | 'description' | 'keplerMapConfig'>>, f: Fetch = fetch): Promise<MapDoc> {
+  return json<MapDoc>(
+    await f(`${WORKSPACE}/maps/${encodeURIComponent(id)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+  );
+}
+
+// saveDataset upserts by dataset id (POST on the collection replaces an existing id).
+export async function saveDataset(mapId: string, doc: DatasetDoc, f: Fetch = fetch): Promise<DatasetDoc> {
+  return json<DatasetDoc>(
+    await f(`${WORKSPACE}/maps/${encodeURIComponent(mapId)}/datasets`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(doc) }),
+  );
+}
+
+export async function deleteDataset(mapId: string, datasetId: string, f: Fetch = fetch): Promise<void> {
+  const res = await f(`${WORKSPACE}/maps/${encodeURIComponent(mapId)}/datasets/${encodeURIComponent(datasetId)}`, { method: 'DELETE' });
+  if (!res.ok && res.status !== 404) throw new ApiError(res.status, res.statusText);
+}
+
+export async function listResources(conn: string, f: Fetch = fetch): Promise<Resource[]> {
+  return json<Resource[]>(await f(`${WORKSPACE}/connections/${encodeURIComponent(conn)}/resources`));
+}
