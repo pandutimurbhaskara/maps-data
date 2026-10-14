@@ -6,6 +6,9 @@ import { MapView, type Viewport } from '../map/MapView';
 import { renderContext } from '../pages/ViewerPage';
 import { LayersPanel } from './LayersPanel';
 import { SourcesPanel } from './SourcesPanel';
+import { WidgetsPanel } from './WidgetsPanel';
+import { WidgetsColumn } from '../widgets/WidgetsColumn';
+import { useViewportFilter } from '../widgets/useViewportFilter';
 import { builderReducer, initState, type BuilderState } from './state';
 import { useAutosave, type SaveApi, type SaveStatus } from './useAutosave';
 import { useRenderedMap } from './useRenderedMap';
@@ -41,6 +44,7 @@ function Builder({ initial, api, fetcher, autosaveDelayMs }: { initial: BuilderS
   const ctx = useMemo(renderContext, []);
   const rendered = useRenderedMap(state, ctx);
   const [viewport, setViewport] = useState<Viewport | null>(null);
+  const spatialFilter = useViewportFilter(viewport);
   const [tab, setTab] = useState<BuilderTab>('sources');
   const c = state.map.keplerMapConfig.config;
 
@@ -89,13 +93,21 @@ function Builder({ initial, api, fetcher, autosaveDelayMs }: { initial: BuilderS
             fetcher={fetcher}
           />
         )}
-        {tab === 'widgets' && <p className="panel">Widgets (Task 14)</p>}
+        {tab === 'widgets' && <WidgetsPanel widgets={c.widgets} datasets={state.datasets} loaded={rendered.prepared?.datasets ?? []} dispatch={dispatch} />}
         {tab === 'parameters' && <p className="panel">Parameters (Task 15)</p>}
       </aside>
       <main className="builder-map">
         <MapView styleId={c.basemapConfig.styleId} initialViewState={c.mapState} layers={rendered.layers} onViewportChange={onViewportChange} />
       </main>
-      <aside className="builder-right" data-viewport={viewport ? 'ready' : 'pending'} />
+      <aside className="builder-right">
+        <WidgetsColumn
+          widgets={c.widgets}
+          datasets={rendered.prepared?.datasets ?? []}
+          filters={c.filters}
+          spatialFilter={spatialFilter}
+          onFilter={(datasetId, filters) => dispatch({ type: 'setFilters', datasetId, filters })}
+        />
+      </aside>
     </div>
   );
 }
