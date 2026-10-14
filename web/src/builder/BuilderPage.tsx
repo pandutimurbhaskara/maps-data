@@ -5,6 +5,7 @@ import { deleteDataset, getDatasets, getMap, patchMap, saveDataset } from '../li
 import { MapView, type Viewport } from '../map/MapView';
 import { renderContext } from '../pages/ViewerPage';
 import { LayersPanel } from './LayersPanel';
+import { ParamsPanel } from './ParamsPanel';
 import { SourcesPanel } from './SourcesPanel';
 import { WidgetsPanel } from './WidgetsPanel';
 import { WidgetsColumn } from '../widgets/WidgetsColumn';
@@ -94,7 +95,7 @@ function Builder({ initial, api, fetcher, autosaveDelayMs }: { initial: BuilderS
           />
         )}
         {tab === 'widgets' && <WidgetsPanel widgets={c.widgets} datasets={state.datasets} loaded={rendered.prepared?.datasets ?? []} dispatch={dispatch} />}
-        {tab === 'parameters' && <p className="panel">Parameters (Task 15)</p>}
+        {tab === 'parameters' && <ParamsPanel params={c.sqlParameters} dispatch={dispatch} />}
       </aside>
       <main className="builder-map">
         <MapView styleId={c.basemapConfig.styleId} initialViewState={c.mapState} layers={rendered.layers} onViewportChange={onViewportChange} />
