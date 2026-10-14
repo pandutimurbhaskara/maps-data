@@ -5,6 +5,7 @@ import { newMapConfig } from '../lib/defaults';
 import { BuilderPage } from './BuilderPage';
 
 vi.mock('../map/MapView', () => ({ MapView: () => <div data-testid="map" /> }));
+vi.mock('../map/MapSurface', () => ({ MapSurface: () => <div data-testid="map" /> }));
 vi.mock('../map/prepareMap', () => ({ prepareMap: vi.fn(async () => ({ parsed: { layers: [] }, datasets: [], errors: {} })) }));
 
 const map = { id: 'm1', title: 'Tokyo', keplerMapConfig: newMapConfig() };

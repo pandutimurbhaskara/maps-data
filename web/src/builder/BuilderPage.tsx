@@ -2,7 +2,8 @@ import { useEffect, useMemo, useReducer, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import type { DatasetDoc, MapDoc } from '../lib/mapDoc';
 import { deleteDataset, getDatasets, getMap, patchMap, saveDataset } from '../lib/workspaceApi';
-import { MapView, type Viewport } from '../map/MapView';
+import { MapSurface } from '../map/MapSurface';
+import type { Viewport } from '../map/MapView';
 import { renderContext } from '../pages/ViewerPage';
 import { LayersPanel } from './LayersPanel';
 import { ParamsPanel } from './ParamsPanel';
@@ -98,7 +99,7 @@ function Builder({ initial, api, fetcher, autosaveDelayMs }: { initial: BuilderS
         {tab === 'parameters' && <ParamsPanel params={c.sqlParameters} dispatch={dispatch} />}
       </aside>
       <main className="builder-map">
-        <MapView styleId={c.basemapConfig.styleId} initialViewState={c.mapState} layers={rendered.layers} onViewportChange={onViewportChange} />
+        <MapSurface config={c} layers={rendered.layers} descriptors={rendered.prepared?.parsed.layers ?? []} onViewportChange={onViewportChange} fetcher={fetcher} />
       </main>
       <aside className="builder-right">
         <WidgetsColumn

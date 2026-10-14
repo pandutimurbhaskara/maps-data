@@ -24,11 +24,12 @@ export interface MapViewProps {
   layers: Layer[];
   onViewportChange?: (v: Viewport) => void;
   onClick?: (info: PickingInfo) => void;
+  onLoad?: (api: { flyTo: FlyTo }) => void;
   children?: ReactNode;
 }
 
 // MapView owns one MapLibre map + deck.gl overlay for its lifetime; props update them in place.
-export function MapView({ styleId, initialViewState, layers, onViewportChange, onClick, children }: MapViewProps) {
+export function MapView({ styleId, initialViewState, layers, onViewportChange, onClick, onLoad, children }: MapViewProps) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibreMap | null>(null);
   const overlay = useRef<MapboxOverlay | null>(null);
@@ -63,6 +64,7 @@ export function MapView({ styleId, initialViewState, layers, onViewportChange, o
     m.once('load', report);
     map.current = m;
     overlay.current = o;
+    onLoad?.({ flyTo: (lng, lat, zoom = 15) => m.flyTo({ center: [lng, lat], zoom }) });
     return () => {
       map.current = null;
       overlay.current = null;
