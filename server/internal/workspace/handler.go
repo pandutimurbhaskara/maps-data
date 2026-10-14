@@ -2,6 +2,7 @@
 package workspace
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -13,6 +14,7 @@ import (
 	"github.com/google/uuid"
 
 	"osm-maps/server/internal/auth"
+	"osm-maps/server/internal/catalog"
 	"osm-maps/server/internal/httpx"
 	"osm-maps/server/internal/store"
 )
@@ -30,6 +32,8 @@ type Connection struct {
 type Handler struct {
 	Store       store.Store
 	Connections []Connection
+	// Resources lists a connection's spatial tables; nil disables the route (404).
+	Resources func(ctx context.Context, conn string) ([]catalog.Resource, error)
 }
 
 func (h *Handler) Register(mux *http.ServeMux, prefix string) {
@@ -43,6 +47,7 @@ func (h *Handler) Register(mux *http.ServeMux, prefix string) {
 	mux.HandleFunc("PATCH "+prefix+"/maps/{id}/datasets/{dsId}", h.authed(h.patchDataset))
 	mux.HandleFunc("DELETE "+prefix+"/maps/{id}/datasets/{dsId}", h.authed(h.deleteDataset))
 	mux.HandleFunc("GET "+prefix+"/connections", h.authed(h.listConnections))
+	mux.HandleFunc("GET "+prefix+"/connections/{name}/resources", h.authed(h.listResources))
 	mux.HandleFunc("GET /v3/maps/public/{id}", h.publicMap)
 }
 
@@ -322,6 +327,26 @@ func (h *Handler) deleteDataset(w http.ResponseWriter, r *http.Request, user str
 
 func (h *Handler) listConnections(w http.ResponseWriter, r *http.Request, _ string) {
 	httpx.WriteJSON(w, http.StatusOK, h.Connections)
+}
+
+func (h *Handler) listResources(w http.ResponseWriter, r *http.Request, _ string) {
+	if h.Resources == nil {
+		httpx.WriteError(w, http.StatusNotFound, "connection not found")
+		return
+	}
+	res, err := h.Resources(r.Context(), r.PathValue("name"))
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			httpx.WriteError(w, http.StatusNotFound, "connection not found")
+			return
+		}
+		fail(w, err)
+		return
+	}
+	if res == nil {
+		res = []catalog.Resource{}
+	}
+	httpx.WriteJSON(w, http.StatusOK, res)
 }
 
 // publicMap serves a public map with its datasets embedded, without authentication (ledger M11).

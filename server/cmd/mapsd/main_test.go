@@ -43,10 +43,11 @@ func TestServerWiring(t *testing.T) {
 	defer srv.Close()
 
 	for path, want := range map[string]string{
-		"/healthz":                            "ok",
-		"/api/workspace/maps":                 `"data":[]`,
-		"/v3/maps/osm/table?name=demo_points": `"tilejson"`,
-		"/api/workspace/connections":          `"osm"`,
+		"/healthz":                                 "ok",
+		"/api/workspace/maps":                      `"data":[]`,
+		"/v3/maps/osm/table?name=demo_points":      `"tilejson"`,
+		"/api/workspace/connections":               `"osm"`,
+		"/api/workspace/connections/osm/resources": `"geoColumn":"geom"`,
 		"/v3/sql/osm/model/formula?type=table&source=demo_points&params=%7B%22column%22%3A%22%2A%22%7D": `"value":400`,
 		"/assets/app.js": "console.log(1)",
 		"/maps":          "<html>app</html>", // SPA fallback

@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"osm-maps/server/internal/auth"
+	"osm-maps/server/internal/catalog"
 	"osm-maps/server/internal/store"
 	"osm-maps/server/internal/workspace"
 )
@@ -160,3 +161,29 @@ func TestDatasetsAndPublicMap(t *testing.T) {
 }
 
 func ptr[T any](v T) *T { return &v }
+
+func TestResources(t *testing.T) {
+	st, err := store.OpenDuck(context.Background(), filepath.Join(t.TempDir(), "meta.duckdb"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	mux := http.NewServeMux()
+	(&workspace.Handler{Store: st, Resources: func(_ context.Context, conn string) ([]catalog.Resource, error) {
+		if conn != "osm" {
+			return nil, store.ErrNotFound
+		}
+		return []catalog.Resource{{Name: "osm_points", GeoColumn: "geom"}}, nil
+	}}).Register(mux, "/api/workspace")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mux.ServeHTTP(w, r.WithContext(auth.WithUser(r.Context(), "alice")))
+	}))
+	defer srv.Close()
+	e := env{srv: srv, store: st}
+	if status, out := e.do(t, "alice", "GET", "/api/workspace/connections/osm/resources", nil); status != 200 || len(out["items"].([]any)) != 1 {
+		t.Fatalf("resources: %d %v", status, out)
+	}
+	if status, _ := e.do(t, "alice", "GET", "/api/workspace/connections/nope/resources", nil); status != 404 {
+		t.Fatalf("unknown connection: %d, want 404", status)
+	}
+}

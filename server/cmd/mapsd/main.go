@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"osm-maps/server/internal/auth"
+	"osm-maps/server/internal/catalog"
 	"osm-maps/server/internal/duck"
 	"osm-maps/server/internal/mapsapi"
 	"osm-maps/server/internal/modelapi"
@@ -96,7 +97,16 @@ func newHandler(ctx context.Context, c config) (http.Handler, func(), error) {
 		MaxFeatures:  200_000,
 	}).Register(mux)
 	(&modelapi.Server{Conns: map[string]*sql.DB{"osm": dataDB}, QueryTimeout: c.QueryTimeout}).Register(mux)
-	(&workspace.Handler{Store: st, Connections: []workspace.Connection{{Name: "osm", Provider: "duckdb"}}}).Register(mux, "/api/workspace")
+	(&workspace.Handler{
+		Store:       st,
+		Connections: []workspace.Connection{{Name: "osm", Provider: "duckdb"}},
+		Resources: func(ctx context.Context, conn string) ([]catalog.Resource, error) {
+			if conn != "osm" {
+				return nil, store.ErrNotFound
+			}
+			return catalog.List(ctx, dataDB)
+		},
+	}).Register(mux, "/api/workspace")
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("ok")) })
 	if c.Web != "" {
 		mux.Handle("GET /", spa(c.Web))
